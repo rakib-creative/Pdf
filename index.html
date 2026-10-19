@@ -1,0 +1,650 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Petal PDF Editor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=DM+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: soft landing with a drop zone, then a sticky toolbar over a scrolling stack of editable pages. */
+:root {
+  --bg: #f6f3fc;
+  --surface: #ffffff;
+  --surface-2: #efeafa;
+  --ink: #2b2540;
+  --muted: #7b7394;
+  --line: #e3dcf3;
+  --accent: #7a5af8;
+  --accent-ink: #ffffff;
+  --accent-soft: #e9e2ff;
+  --pink: #ff8fab;
+  --mint: #4fcfae;
+  --danger: #e5546b;
+  --shadow: 0 10px 30px rgba(92, 64, 190, 0.12);
+  --font-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15121f; --surface: #1f1b2f; --surface-2: #2a2540; --ink: #f1edfb; --muted: #a49bbd;
+    --line: #342e4e; --accent: #9b82ff; --accent-ink: #15121f; --accent-soft: #2f2755;
+    --pink: #ff9db6; --mint: #5fdcbc; --danger: #ff7d90; --shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15121f; --surface: #1f1b2f; --surface-2: #2a2540; --ink: #f1edfb; --muted: #a49bbd;
+  --line: #342e4e; --accent: #9b82ff; --accent-ink: #15121f; --accent-soft: #2f2755;
+  --pink: #ff9db6; --mint: #5fdcbc; --danger: #ff7d90; --shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0; min-height: 100vh;
+}
+h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.02em; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Landing ---------- */
+.landing { max-width: 760px; margin: 0 auto; padding-block: 36px 56px; display: grid; gap: 28px; }
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 20px; }
+.brand-mark { width: 34px; height: 34px; border-radius: 12px 12px 12px 4px; background: linear-gradient(135deg, var(--accent), var(--pink)); display: grid; place-items: center; color: #fff; }
+.hero h1 { font-size: clamp(34px, 7vw, 56px); line-height: 1.05; font-weight: 700; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero p { color: var(--muted); font-size: 17px; max-width: 52ch; margin: 14px 0 0; }
+.drop {
+  position: relative; border: 2px dashed var(--accent); border-radius: 28px; background: var(--surface);
+  padding: 44px 20px; text-align: center; display: grid; gap: 12px; justify-items: center; box-shadow: var(--shadow);
+  transition: background 0.2s, transform 0.2s;
+}
+.drop.over { background: var(--accent-soft); transform: scale(1.01); }
+.drop-icon { width: 64px; height: 64px; border-radius: 20px; background: var(--accent-soft); display: grid; place-items: center; color: var(--accent); }
+.drop h2 { font-size: 22px; }
+.drop p { margin: 0; color: var(--muted); }
+.btn {
+  border: 0; border-radius: 999px; padding: 11px 20px; font-weight: 600; background: var(--accent); color: var(--accent-ink);
+  display: inline-flex; align-items: center; gap: 8px; transition: transform 0.15s, filter 0.15s;
+}
+.btn:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.btn.soft { background: var(--accent-soft); color: var(--accent); }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn.pink { background: var(--pink); color: #3a1020; }
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; }
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.feature { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 16px; }
+.feature b { display: block; font-family: var(--font-display); font-size: 16px; margin-bottom: 2px; }
+.feature span { color: var(--muted); font-size: 14px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+.err { color: var(--danger); font-weight: 500; min-height: 1.4em; }
+
+/* ---------- Editor ---------- */
+.editor[hidden] { display: none !important; }
+.topbar-fill { position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--surface); z-index: 20; }
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 15; margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px));
+  background: var(--surface); border-bottom: 1px solid var(--line); box-shadow: var(--shadow);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+}
+.fname { font-family: var(--font-display); font-weight: 700; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp { flex: 1 1 8px; }
+.tool { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
+a.btn { text-decoration: none; }
+.tool label { color: var(--muted); font-size: 13px; }
+.tool input[type="number"] { width: 62px; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; background: var(--bg); color: var(--ink); font: inherit; }
+.tool input[type="color"] { width: 34px; height: 32px; border: 1px solid var(--line); border-radius: 10px; padding: 2px; background: var(--bg); }
+.pager { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.hint { margin: 14px auto 0; max-width: 900px; background: var(--accent-soft); color: var(--ink); border-radius: 16px; padding: 10px 14px; font-size: 14px; }
+.stack { display: grid; gap: 22px; justify-items: center; padding-block: 18px 80px; }
+.page-wrap { max-width: 100%; overflow-x: auto; border-radius: 6px; }
+.page { position: relative; background: #fff; box-shadow: var(--shadow); border-radius: 6px; overflow: hidden; }
+.page canvas { display: block; }
+.page-num { text-align: center; color: var(--muted); font-size: 13px; margin-top: 6px; }
+.tb {
+  position: absolute; white-space: pre; line-height: 1; margin: 0; padding: 0 1px; color: transparent; background: transparent;
+  outline: 0; cursor: text; border-radius: 2px; font-family: Helvetica, Arial, sans-serif; transform-origin: 0 0;
+}
+.tb:hover { box-shadow: 0 0 0 1.5px var(--pink); }
+.show-boxes .tb:not(.edited):not(.gone):not(.editing):not(.added) { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.show-boxes .tb:not(.edited):not(.gone):not(.editing):not(.added):hover { box-shadow: 0 0 0 2px var(--pink); background: color-mix(in srgb, var(--pink) 14%, transparent); }
+.tb.edited, .tb.added { color: var(--c, #000); background: #fff; }
+.tb.editing { color: var(--c, #000); background: #fff; box-shadow: 0 0 0 2px var(--accent); z-index: 3; }
+.tb.added { background: transparent; box-shadow: 0 0 0 1px var(--line); min-width: 24px; min-height: 1em; }
+.tb.added.editing, .tb.added.sel { background: rgba(255,255,255,0.9); box-shadow: 0 0 0 2px var(--accent); }
+.tb.gone { color: transparent; background: #fff; }
+.toast {
+  position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  background: var(--ink); color: var(--bg); padding: 11px 18px; border-radius: 999px; font-weight: 500; z-index: 40;
+  box-shadow: var(--shadow); max-width: calc(100vw - 32px); text-align: center;
+}
+.toast[hidden] { display: none !important; }
+.busy { position: fixed; inset: 0; background: color-mix(in srgb, var(--bg) 80%, transparent); display: grid; place-items: center; z-index: 50; }
+.busy[hidden] { display: none !important; }
+.busy-card { background: var(--surface); border-radius: 24px; padding: 24px 28px; box-shadow: var(--shadow); text-align: center; display: grid; gap: 10px; min-width: 220px; }
+.bar { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--pink)); transition: width 0.2s; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 640px) { .fname { display: none; } .topbar { gap: 6px 8px; } .tool { gap: 6px; } .btn { padding: 8px 12px; font-size: 14px; } .tool input[type="number"] { width: 54px; } }
+</style>
+<div class="topbar-fill"></div>
+
+<main class="landing" id="landing">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 14l2 2 4-4"/></svg>
+    </span>
+    Petal PDF Editor
+  </div>
+
+  <section class="hero">
+    <h1>Edit your PDF, <em>gently</em>.</h1>
+    <p>Upload a PDF, click any text to change it, add new text, then save it back as a PDF or a Word document. Everything happens in your browser, so your file stays with you.</p>
+  </section>
+
+  <section class="drop" id="drop" aria-label="Upload a PDF">
+    <div class="drop-icon" aria-hidden="true">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+    </div>
+    <h2>Drop a PDF here</h2>
+    <p>or choose a file from your device</p>
+    <button class="btn" id="pick" type="button">Choose PDF</button>
+    <input id="file" type="file" accept="application/pdf,.pdf" hidden>
+    <div class="err" id="err" role="alert"></div>
+  </section>
+
+  <section class="features">
+    <div class="feature"><b><span class="dot" style="background:var(--accent)"></span>Click to edit</b><span>Tap any line of text and type over it.</span></div>
+    <div class="feature"><b><span class="dot" style="background:var(--pink)"></span>Add new text</b><span>Place your own words, pick size and color.</span></div>
+    <div class="feature"><b><span class="dot" style="background:var(--mint)"></span>PDF or Word</b><span>Download the result in the format you need.</span></div>
+  </section>
+</main>
+
+<section class="editor" id="editor" hidden>
+  <div class="topbar">
+    <span class="fname" id="fname">document.pdf</span>
+    <span class="pager" id="pager"></span>
+    <span class="sp"></span>
+    <span class="tool">
+      <button class="btn ghost" id="undo" type="button" disabled title="Undo (Ctrl+Z)">Undo</button>
+      <button class="btn ghost" id="redo" type="button" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
+      <button class="btn soft" id="addText" type="button">+ Add text</button>
+      <label for="size">Size</label><input id="size" type="number" min="6" max="120" value="14">
+      <input id="color" type="color" value="#2b2540" aria-label="Text color">
+      <button class="btn ghost" id="del" type="button" disabled>Delete</button>
+    </span>
+    <span class="tool">
+      <button class="btn" id="dlPdf" type="button">Download PDF</button>
+      <button class="btn pink" id="dlDocx" type="button">Download Word</button>
+      <button class="btn ghost" id="newFile" type="button">New file</button>
+    </span>
+  </div>
+  <div class="hint" id="hint">Click any text on the page to edit it. Use "Add text" to place something new.</div>
+  <div class="dlbar" id="dlbar" hidden>
+    <span id="dlmsg"></span>
+    <button class="btn" id="dlsave" type="button">Save file</button>
+    <a class="btn" id="dlget" hidden>Download file</a>
+    <a class="btn pink" id="dllink" target="_blank" rel="noopener" hidden>Open file</a>
+    <button class="btn pink" id="dlcopy" type="button" hidden>Copy text</button>
+    <button class="btn soft" id="dlperm" type="button" hidden>Open permissions</button>
+    <button class="btn ghost" id="dlclose" type="button">Close</button>
+  </div>
+  <div class="stack" id="stack"></div>
+</section>
+
+<div class="busy" id="busy" hidden>
+  <div class="busy-card"><b id="busyMsg">Working...</b><div class="bar"><i id="busyBar"></i></div></div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+<style>
+.tb .tx { display: inline-block; padding: 0.12em 2px; outline: 0; min-width: 1ch; }
+.tb.added .tx { min-width: 2ch; }
+.grip { position: absolute; left: -15px; top: 50%; width: 13px; height: 13px; margin-top: -7px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; cursor: grab; display: none; touch-action: none; }
+.tb.added:hover .grip, .tb.added.sel .grip, .tb.added:focus-within .grip { display: block; }
+.placing .page { cursor: crosshair; }
+.dlbar { max-width: 900px; margin: 12px auto 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: var(--surface); border: 2px solid var(--accent); border-radius: 18px; padding: 12px 14px; box-shadow: var(--shadow); }
+.dlbar span { flex: 1 1 220px; min-width: 0; }
+.dlbar[hidden] { display: none !important; }
+.placing .tb { pointer-events: none; }
+</style>
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  const pdfjs = window["pdfjs-dist/build/pdf"];
+  if (pdfjs) pdfjs.GlobalWorkerOptions.workerSrc = WORKER;
+
+  const state = { bytes: null, name: "document.pdf", pages: [], sel: null, nextId: 1, placing: false };
+  window.__petal = state;
+
+  /* ---------- small helpers ---------- */
+  let toastTimer;
+  function toast(msg, ms = 2600) {
+    const t = $("toast"); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, ms);
+  }
+  function busy(on, msg, pct) {
+    $("busy").hidden = !on;
+    if (msg) $("busyMsg").textContent = msg;
+    if (typeof pct === "number") $("busyBar").style.width = Math.round(pct * 100) + "%";
+  }
+  function showError(msg) { $("err").textContent = msg || ""; }
+
+  /* ---------- upload ---------- */
+  const drop = $("drop"), fileInput = $("file");
+  $("pick").addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => { if (fileInput.files[0]) openFile(fileInput.files[0]); fileInput.value = ""; });
+  ["dragenter", "dragover"].forEach((ev) => document.addEventListener(ev, (e) => { e.preventDefault(); if (!$("landing").hidden) drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => document.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  document.addEventListener("drop", (e) => {
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f && !$("landing").hidden) openFile(f);
+  });
+
+  async function openFile(file) {
+    showError("");
+    if (!pdfjs || !window.PDFLib) { showError("The PDF tools did not load. Please reload the page and try again."); return; }
+    if (!(file.type === "application/pdf" || /\.pdf$/i.test(file.name))) { showError("Please choose a PDF file."); return; }
+    busy(true, "Opening your PDF...", 0.02);
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      state.bytes = buf; state.name = file.name;
+      const doc = await pdfjs.getDocument({ data: buf.slice() }).promise;
+      $("stack").innerHTML = ""; state.pages = []; state.sel = null;
+      $("landing").hidden = true; $("editor").hidden = false;
+      $("fname").textContent = file.name; $("fname").title = file.name;
+      await renderAll(doc);
+      toast("Ready. Click any text to edit it.");
+      resetHistory();
+    } catch (err) {
+      console.error(err);
+      $("landing").hidden = false; $("editor").hidden = true;
+      showError(err && err.name === "PasswordException" ? "This PDF is password protected. Remove the password first, then upload it again." : "That file could not be opened. It may be damaged.");
+    } finally { busy(false); }
+  }
+
+  /* ---------- rendering ---------- */
+  async function renderAll(doc) {
+    const avail = Math.min(900, document.documentElement.clientWidth - 34);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const total = doc.numPages;
+    for (let n = 1; n <= total; n++) {
+      busy(true, "Preparing page " + n + " of " + total, (n - 0.5) / total);
+      const page = await doc.getPage(n);
+      const base = page.getViewport({ scale: 1 });
+      const scale = Math.min(2, avail / base.width);
+      const vp = page.getViewport({ scale });
+      const wrap = document.createElement("div");
+      wrap.className = "page-block"; wrap.dataset.page = n;
+      const holder = document.createElement("div"); holder.className = "page-wrap";
+      const pageEl = document.createElement("div");
+      pageEl.className = "page"; pageEl.style.width = vp.width + "px"; pageEl.style.height = vp.height + "px";
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.floor(vp.width * dpr); canvas.height = Math.floor(vp.height * dpr);
+      canvas.style.width = vp.width + "px"; canvas.style.height = vp.height + "px";
+      pageEl.appendChild(canvas); holder.appendChild(pageEl); wrap.appendChild(holder);
+      const label = document.createElement("div"); label.className = "page-num"; label.textContent = "Page " + n;
+      wrap.appendChild(label);
+      $("stack").appendChild(wrap);
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp, transform: [dpr, 0, 0, dpr, 0, 0] }).promise;
+
+      const pg = { n, vp, el: pageEl, runs: [], editable: (page.rotate % 360) === 0 };
+      state.pages.push(pg);
+      if (pg.editable) {
+        const tc = await page.getTextContent();
+        buildRuns(tc.items).forEach((r) => { r.page = pg; pg.runs.push(r); mountRun(r); });
+      } else { label.textContent = "Page " + n + " (rotated page, view only)"; }
+      pageEl.addEventListener("pointerdown", (e) => onPagePointer(e, pg));
+    }
+    watchPager();
+  }
+
+  /* Merge pdf.js text items into line-sized boxes that are comfortable to edit. */
+  function buildRuns(items) {
+    const raw = [];
+    for (const it of items) {
+      if (typeof it.str !== "string" || !it.transform) continue;
+      const t = it.transform;
+      if (Math.abs(t[1]) > 0.01 || Math.abs(t[2]) > 0.01) continue; // skip rotated text
+      const size = Math.hypot(t[2], t[3]);
+      if (!size || size < 2) continue;
+      raw.push({ x: t[4], y: t[5], size, w: it.width || 0, text: it.str });
+    }
+    raw.sort((a, b) => (Math.abs(a.y - b.y) < Math.min(a.size, b.size) * 0.3 ? a.x - b.x : b.y - a.y));
+    const runs = []; let cur = null;
+    for (const r of raw) {
+      if (cur && Math.abs(cur.y - r.y) < cur.size * 0.3 && Math.abs(cur.size - r.size) < 1.5 && r.x - (cur.x + cur.w) < cur.size * 2.2 && r.x - (cur.x + cur.w) > -cur.size * 0.5) {
+        const gap = r.x - (cur.x + cur.w);
+        if (gap > cur.size * 0.18 && !/\s$/.test(cur.text) && !/^\s/.test(r.text)) cur.text += " ";
+        cur.text += r.text; cur.w = r.x + r.w - cur.x;
+      } else { if (cur) runs.push(cur); cur = { ...r }; }
+    }
+    if (cur) runs.push(cur);
+    return runs.filter((r) => r.text.trim() !== "").map((r) => ({
+      id: state.nextId++, kind: "orig", x: r.x, y: r.y, size: r.size, w: r.w, text: r.text.replace(/\s+$/, ""), orig: r.text.replace(/\s+$/, ""), color: "#000000"
+    }));
+  }
+
+  /* ---------- text boxes ---------- */
+  function layout(r) {
+    const vp = r.page.vp; const p = vp.convertToViewportPoint(r.x, r.y);
+    const fs = r.size * vp.scale;
+    r.el.style.fontSize = fs + "px";
+    r.el.style.left = (p[0] - 2) + "px";
+    r.el.style.top = (p[1] - 0.85 * fs - 0.12 * fs) + "px";
+    r.el.style.setProperty("--c", r.color);
+    r.tx.style.minWidth = r.kind === "orig" ? Math.max(r.w * vp.scale, 8) + "px" : "";
+  }
+  function paintState(r) {
+    r.el.classList.toggle("edited", r.kind === "orig" && (r.text !== r.orig || r.dirty) && r.text !== "");
+    r.el.classList.toggle("gone", r.kind === "orig" && r.text === "");
+  }
+  function mountRun(r) {
+    const el = document.createElement("div"); el.className = "tb " + (r.kind === "added" ? "added" : "");
+    const tx = document.createElement("span"); tx.className = "tx"; tx.contentEditable = "true"; tx.spellcheck = false;
+    tx.textContent = r.text; el.appendChild(tx);
+    r.el = el; r.tx = tx;
+    if (r.kind === "added") {
+      const g = document.createElement("span"); g.className = "grip"; g.contentEditable = "false"; g.title = "Drag to move";
+      el.appendChild(g); wireDrag(r, g);
+    }
+    tx.addEventListener("focus", () => select(r, true));
+    tx.addEventListener("input", () => { r.text = tx.textContent.replace(/\n/g, " "); if (r.kind === "orig") paintState(r); });
+    tx.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); tx.blur(); } });
+    tx.addEventListener("paste", (e) => { e.preventDefault(); const t = (e.clipboardData || window.clipboardData).getData("text").replace(/\s+/g, " "); document.execCommand("insertText", false, t); });
+    tx.addEventListener("blur", () => {
+      el.classList.remove("editing");
+      r.text = tx.textContent.replace(/\n/g, " ");
+      if (r.kind === "added" && r.text.trim() === "") { removeRun(r); commitHistory(); return; }
+      if (r.kind === "orig") { if (r.text === "") tx.textContent = ""; paintState(r); }
+      commitHistory();
+    });
+    r.page.el.appendChild(el); layout(r); paintState(r);
+  }
+  function select(r, editing) {
+    if (state.sel && state.sel.el) state.sel.el.classList.remove("sel");
+    state.sel = r; r.el.classList.add("sel");
+    if (editing) r.el.classList.add("editing");
+    $("size").value = Math.round(r.size * 10) / 10; $("color").value = r.color; $("del").disabled = false;
+  }
+  function removeRun(r) {
+    const arr = r.page.runs; const i = arr.indexOf(r); if (i >= 0) arr.splice(i, 1);
+    r.el.remove(); if (state.sel === r) { state.sel = null; $("del").disabled = true; }
+  }
+  function wireDrag(r, grip) {
+    grip.addEventListener("pointerdown", (e) => {
+      e.preventDefault(); e.stopPropagation(); select(r, false);
+      const vp = r.page.vp; const sx = e.clientX, sy = e.clientY; const p0 = vp.convertToViewportPoint(r.x, r.y);
+      grip.setPointerCapture(e.pointerId);
+      const move = (ev) => { const np = vp.convertToPdfPoint(p0[0] + ev.clientX - sx, p0[1] + ev.clientY - sy); r.x = np[0]; r.y = np[1]; layout(r); };
+      const up = () => { grip.removeEventListener("pointermove", move); grip.removeEventListener("pointerup", up); commitHistory(); };
+      grip.addEventListener("pointermove", move); grip.addEventListener("pointerup", up);
+    });
+  }
+
+  /* ---------- toolbar ---------- */
+  $("addText").addEventListener("click", () => {
+    state.placing = !state.placing;
+    $("stack").classList.toggle("placing", state.placing);
+    $("hint").textContent = state.placing ? "Now click on the page where you want the new text." : "Click any text on the page to edit it. Use \"Add text\" to place something new.";
+  });
+  function onPagePointer(e, pg) {
+    if (!state.placing || !pg.editable) return;
+    if (e.target.closest && e.target.closest(".tb")) return;
+    e.preventDefault();
+    const rect = pg.el.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    const size = parseFloat($("size").value) || 14; const fs = size * pg.vp.scale;
+    const pt = pg.vp.convertToPdfPoint(px, py + 0.85 * fs);
+    const r = { id: state.nextId++, kind: "added", x: pt[0], y: pt[1], size, w: 0, text: "New text", orig: "", color: $("color").value, page: pg };
+    pg.runs.push(r); mountRun(r);
+    state.placing = false; $("stack").classList.remove("placing");
+    $("hint").textContent = "Type your text. Drag the round handle to move it.";
+    r.tx.focus(); document.execCommand("selectAll", false, null);
+  }
+  $("size").addEventListener("input", () => {
+    const r = state.sel; const v = parseFloat($("size").value); if (!r || !(v >= 4)) return;
+    r.size = v; r.dirty = true; layout(r); paintState(r);
+  });
+  $("size").addEventListener("change", () => commitHistory());
+  $("color").addEventListener("change", () => commitHistory());
+  $("color").addEventListener("input", () => {
+    const r = state.sel; if (!r) return; r.color = $("color").value; r.dirty = true; layout(r); paintState(r);
+  });
+  $("del").addEventListener("mousedown", (e) => e.preventDefault());
+  $("del").addEventListener("click", () => {
+    const r = state.sel; if (!r) return;
+    if (r.kind === "added") removeRun(r);
+    else { r.text = ""; r.tx.textContent = ""; paintState(r); }
+    commitHistory(); toast("Removed");
+  });
+  $("newFile").addEventListener("click", () => {
+    $("editor").hidden = true; $("landing").hidden = false; $("stack").innerHTML = "";
+    $("dlbar").hidden = true; resetHistory(true);
+    state.pages = []; state.sel = null; state.bytes = null; state.placing = false; $("stack").classList.remove("placing"); showError("");
+    window.scrollTo(0, 0);
+  });
+
+
+  /* ---------- undo / redo ---------- */
+  let hist = [], hi = -1, restoring = false;
+  const snap = () => JSON.stringify(state.pages.map((p) => p.runs.map((r) => ({ id: r.id, kind: r.kind, x: r.x, y: r.y, size: r.size, w: r.w, text: r.text, orig: r.orig, color: r.color, dirty: !!r.dirty }))));
+  function updateHistoryButtons() { $("undo").disabled = hi <= 0; $("redo").disabled = hi >= hist.length - 1; }
+  function resetHistory(empty) { hist = empty ? [] : [snap()]; hi = empty ? -1 : 0; updateHistoryButtons(); }
+  function commitHistory() {
+    if (restoring || hi < 0) return;
+    const s = snap(); if (s === hist[hi]) return;
+    hist = hist.slice(0, hi + 1); hist.push(s); if (hist.length > 100) hist.shift(); hi = hist.length - 1; updateHistoryButtons();
+    document.dispatchEvent(new CustomEvent("petal-change"));
+  }
+  function restore(json) {
+    restoring = true;
+    const data = JSON.parse(json);
+    state.pages.forEach((pg, i) => {
+      pg.runs.forEach((r) => r.el.remove()); pg.runs = [];
+      (data[i] || []).forEach((o) => { const r = Object.assign({}, o, { page: pg }); pg.runs.push(r); mountRun(r); });
+    });
+    state.sel = null; $("del").disabled = true; restoring = false;
+  }
+  function undo() { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); if (hi > 0) { hi--; restore(hist[hi]); updateHistoryButtons(); document.dispatchEvent(new CustomEvent("petal-change")); } }
+  function redo() { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); if (hi < hist.length - 1) { hi++; restore(hist[hi]); updateHistoryButtons(); document.dispatchEvent(new CustomEvent("petal-change")); } }
+  $("undo").addEventListener("click", undo); $("redo").addEventListener("click", redo);
+  document.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || $("editor").hidden) return;
+    const k = e.key.toLowerCase();
+    if (k === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+    else if (k === "y") { e.preventDefault(); redo(); }
+  });
+
+  function watchPager() {
+    const total = state.pages.length; $("pager").textContent = "Page 1 of " + total;
+    if (!("IntersectionObserver" in window)) return;
+    const io = new IntersectionObserver((es) => {
+      es.forEach((en) => { if (en.isIntersecting) $("pager").textContent = "Page " + en.target.dataset.page + " of " + total; });
+    }, { threshold: 0.4 });
+    document.querySelectorAll(".page-block").forEach((b) => io.observe(b));
+  }
+
+  window.__petalUtil = { toast, busy };
+})();
+</script>
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const state = window.__petal; const { toast, busy } = window.__petalUtil;
+
+  const baseName = () => (state.name || "document").replace(/\.pdf$/i, "");
+  const hexToRgb = (hex) => {
+    const h = (hex || "#000000").replace("#", "");
+    return { r: parseInt(h.slice(0, 2), 16) / 255, g: parseInt(h.slice(2, 4), 16) / 255, b: parseInt(h.slice(4, 6), 16) / 255 };
+  };
+  const changed = (r) => r.text !== r.orig || r.dirty;
+
+  /* ---------- PDF ---------- */
+  async function buildPdf() {
+    const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
+    const doc = await PDFDocument.load(state.bytes, { ignoreEncryption: true });
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const known = new Set(font.getCharacterSet());
+    const clean = (s) => Array.from(
+      s.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-").replace(/ /g, " ").replace(/\s+/g, " ")
+    ).map((c) => (known.has(c.codePointAt(0)) ? c : "?")).join("");
+    const pdfPages = doc.getPages();
+    let skipped = 0;
+    state.pages.forEach((pg, i) => {
+      const page = pdfPages[i]; if (!page) return;
+      pg.runs.forEach((r) => {
+        const text = clean(r.text || "");
+        if (r.kind === "orig") {
+          if (!changed(r)) return;
+          const tw = font.widthOfTextAtSize(text, r.size);
+          page.drawRectangle({ x: r.x - 1.5, y: r.y - r.size * 0.28, width: Math.max(r.w, tw) + 3, height: r.size * 1.32, color: rgb(1, 1, 1) });
+        }
+        if (!text.trim()) return;
+        if (/\?/.test(text) && !/\?/.test(r.text)) skipped++;
+        const c = hexToRgb(r.color);
+        page.drawText(text, { x: r.x, y: r.y, size: r.size, font, color: rgb(c.r, c.g, c.b) });
+      });
+    });
+    const bytes = await doc.save();
+    return { bytes, skipped };
+  }
+
+  /* ---------- Word ---------- */
+  function collectLines(pg) {
+    const runs = pg.runs.filter((r) => (r.text || "").trim() !== "").slice().sort((a, b) => (Math.abs(a.y - b.y) < Math.min(a.size, b.size) * 0.5 ? a.x - b.x : b.y - a.y));
+    const lines = [];
+    runs.forEach((r) => {
+      const last = lines[lines.length - 1];
+      if (last && Math.abs(last.y - r.y) < Math.min(last.size, r.size) * 0.5) { last.parts.push(r); last.size = Math.max(last.size, r.size); }
+      else lines.push({ y: r.y, size: r.size, parts: [r] });
+    });
+    return lines;
+  }
+  async function buildDocx() {
+    const D = window.docx; if (!D) throw new Error("docx missing");
+    const all = state.pages.flatMap((p) => p.runs.map((r) => r.size)).sort((a, b) => a - b);
+    const median = all.length ? all[Math.floor(all.length / 2)] : 12;
+    const sections = state.pages.map((pg) => {
+      const lines = collectLines(pg); const kids = []; let prevY = null;
+      lines.forEach((ln) => {
+        const gap = prevY === null ? 0 : prevY - ln.y; prevY = ln.y;
+        const heading = ln.size > median * 1.3;
+        const runs = ln.parts.map((r, idx) => new D.TextRun({
+          text: (idx > 0 ? "   " : "") + r.text.replace(/\s+/g, " "),
+          size: Math.max(16, Math.min(96, Math.round(r.size * 2))),
+          bold: heading, color: (r.color || "#000000").replace("#", ""), font: "Calibri"
+        }));
+        kids.push(new D.Paragraph({ children: runs, spacing: { before: gap > ln.size * 2 ? 200 : 0, after: heading ? 140 : 80 } }));
+      });
+      if (!kids.length) kids.push(new D.Paragraph({ children: [new D.TextRun({ text: "(No editable text on this page)", italics: true, color: "888888" })] }));
+      return { properties: {}, children: kids };
+    });
+    const doc = new D.Document({ creator: "Petal PDF Editor", title: baseName(), sections });
+    return D.Packer.toBlob(doc);
+  }
+
+  /* ---------- saving through the viewer ---------- */
+  /* Building a file takes a moment, so the save itself runs from a fresh tap on "Save file".
+     If this view cannot save files, the bar offers an Open PDF link or Copy text instead. */
+  const getCap = async (name) => { try { return window.claude && window.claude.use ? await window.claude.use(name) : null; } catch (e) { return null; } };
+  let DL = null; getCap("downloads").then((d) => { DL = d; });
+  let pending = null;
+  const bar = () => $("dlbar");
+  function showBar(msg, o) {
+    o = o || {};
+    $("dlmsg").textContent = msg;
+    $("dlsave").hidden = !o.save; $("dlget").hidden = !o.get; $("dllink").hidden = !o.link; $("dlcopy").hidden = !o.copy; $("dlperm").hidden = !o.perm;
+    if (o.link) $("dllink").href = o.link;
+    bar().hidden = false; bar().scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+  const kb = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB");
+  function plainText() {
+    return state.pages.map((pg) => collectLines(pg).map((ln) => ln.parts.map((r) => r.text.replace(/\s+/g, " ")).join("   ")).join("\n")).join("\n\n");
+  }
+  function countEdits() {
+    return state.pages.reduce((n, pg) => n + pg.runs.filter((r) => (r.kind === "added" ? r.text.trim() !== "" : changed(r))).length, 0);
+  }
+  function ready(filename, data, size, label) {
+    pending = { filename, data };
+    const n = countEdits();
+    const what = n === 0
+      ? "No edits were found, so this is the same as the original. Click text on the page, change it, then tap Download again."
+      : "Your " + label + " is ready with " + n + " edit" + (n === 1 ? "" : "s") + " (" + filename + ", " + kb(size) + "). Tap Save file to download it.";
+    showBar(what, { save: n > 0 });
+  }
+  /* Any edit makes a finished file out of date, so hide it and ask for a fresh download. */
+  document.addEventListener("petal-change", () => { if (pending) { pending = null; showBar("You changed the page after building the file. Tap Download PDF or Download Word again to include your latest edits.", {}); } });
+  $("dlclose").addEventListener("click", () => { bar().hidden = true; pending = null; });
+
+  async function fallback(why) {
+    const perms = await getCap("permissions");
+    let st = "unknown"; if (perms) { try { st = await perms.state("downloads"); } catch (e) { st = "unknown"; } }
+    const canPerm = !!perms && (st === "denied" || st === "prompt");
+    const isPdf = /\.pdf$/i.test(pending.filename);
+    const mime = isPdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const typed = new Blob([pending.data], { type: mime });
+    const url = URL.createObjectURL(typed);
+    $("dlget").href = url; $("dlget").setAttribute("download", pending.filename);
+    let openUrl = url;
+    if (isPdf) {
+      const assets = await getCap("assets");
+      if (assets) { try { openUrl = (await assets.upload(typed)).url; } catch (e) { /* keep the local link */ } }
+    }
+    showBar("This app does not give the page its normal save option, so try this: tap Download file. If nothing happens, tap Open file and save it from there." + (isPdf ? "" : " You can also copy the text and paste it into Word."), { get: true, link: openUrl, copy: !isPdf, perm: canPerm });
+  }
+  $("dlcopy").addEventListener("click", async () => {
+    const text = plainText();
+    try { await navigator.clipboard.writeText(text); toast("Text copied"); }
+    catch (e) { showBar("Copy was blocked here. Select the text on the page and copy it manually.", {}); }
+  });
+  $("dlperm").addEventListener("click", async () => {
+    const perms = await getCap("permissions"); if (!perms) return;
+    try {
+      let st = await perms.state("downloads");
+      if (st === "prompt") st = (await perms.request(["downloads"]))["downloads"];
+      else if (st === "denied") await perms.manage();
+      DL = await getCap("downloads");
+      showBar(DL ? "Saving is now available. Tap Save file." : "Saving is still not available in this view.", { save: !!DL });
+    } catch (e) { showBar("Open this artifact's Permissions menu to turn downloads on.", {}); }
+  });
+  $("dlsave").addEventListener("click", async () => {
+    if (!pending) return;
+    const dl = DL || await getCap("downloads");
+    if (!dl) { await fallback("not available"); return; }
+    try { await dl.save(pending); showBar("Saved " + pending.filename + ".", {}); toast("Saved " + pending.filename); pending = null; }
+    catch (e) {
+      const code = e && e.code ? e.code : "unknown";
+      if (code === "declined") showBar("Download cancelled. Tap Save file to try again.", { save: true });
+      else if (code === "rate_limited") showBar("Please wait a moment, then tap Save file again.", { save: true });
+      else if (["unavailable", "not_granted", "capability_disabled", "capability_removed"].includes(code)) await fallback(code);
+      else showBar("The file could not be saved (" + code + "). Tap Save file to try again.", { save: true });
+    }
+  });
+  function commit() { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
+
+  $("dlPdf").addEventListener("click", async () => {
+    if (!state.bytes) return; commit(); bar().hidden = true;
+    busy(true, "Building your PDF...", 0.5);
+    try {
+      const { bytes, skipped } = await buildPdf(); busy(false);
+      ready(baseName() + "-edited.pdf", bytes, bytes.length, "PDF");
+      if (skipped) toast("Some characters are not supported in PDF text and became ?", 5000);
+    } catch (err) { console.error(err); busy(false); showBar("This PDF could not be rebuilt. It may be protected.", {}); }
+  });
+  $("dlDocx").addEventListener("click", async () => {
+    if (!state.bytes) return; commit(); bar().hidden = true;
+    busy(true, "Building your Word file...", 0.5);
+    try { const blob = await buildDocx(); busy(false); ready(baseName() + "-edited.docx", blob, blob.size, "Word file"); }
+    catch (err) { console.error(err); busy(false); showBar("The Word file could not be built. Please reload the page and try again.", {}); }
+  });
+})();
+</script>
+
+</body></html>
