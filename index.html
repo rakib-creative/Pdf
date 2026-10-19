@@ -1,4 +1,5 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Petal PDF Editor</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=DM+Sans:wght@400;500;600&display=swap">
@@ -100,7 +101,14 @@ a.btn { text-decoration: none; }
 .page-wrap { max-width: 100%; overflow-x: auto; border-radius: 6px; }
 .page { position: relative; background: #fff; box-shadow: var(--shadow); border-radius: 6px; overflow: hidden; }
 .page canvas { display: block; }
-.page-num { text-align: center; color: var(--muted); font-size: 13px; margin-top: 6px; }
+.page-num { color: var(--muted); font-size: 13px; }
+.page-actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; margin-top: 8px; }
+.btn.sm { padding: 6px 14px; font-size: 13px; }
+.btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.removed-card { display: none; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; padding: 22px 16px; border: 2px dashed var(--line); border-radius: 18px; background: var(--surface); color: var(--muted); min-width: min(100%, 320px); }
+.page-block.removed .removed-card { display: flex; }
+.page-block.removed .page-wrap, .page-block.removed .page-actions { display: none; }
+.page-block { max-width: 100%; }
 .tb {
   position: absolute; white-space: pre; line-height: 1; margin: 0; padding: 0 1px; color: transparent; background: transparent;
   outline: 0; cursor: text; border-radius: 2px; font-family: Helvetica, Arial, sans-serif; transform-origin: 0 0;
@@ -288,12 +296,20 @@ a.btn { text-decoration: none; }
       canvas.width = Math.floor(vp.width * dpr); canvas.height = Math.floor(vp.height * dpr);
       canvas.style.width = vp.width + "px"; canvas.style.height = vp.height + "px";
       pageEl.appendChild(canvas); holder.appendChild(pageEl); wrap.appendChild(holder);
-      const label = document.createElement("div"); label.className = "page-num"; label.textContent = "Page " + n;
-      wrap.appendChild(label);
+      const label = document.createElement("span"); label.className = "page-num"; label.textContent = "Page " + n;
+      const actions = document.createElement("div"); actions.className = "page-actions";
+      const rm = document.createElement("button"); rm.type = "button"; rm.className = "btn danger sm"; rm.textContent = "Remove page";
+      actions.appendChild(label); actions.appendChild(rm); wrap.appendChild(actions);
+      const card = document.createElement("div"); card.className = "removed-card";
+      const cardMsg = document.createElement("span"); cardMsg.textContent = "Page " + n + " will be left out of the download.";
+      const rs = document.createElement("button"); rs.type = "button"; rs.className = "btn soft sm"; rs.textContent = "Restore page";
+      card.appendChild(cardMsg); card.appendChild(rs); wrap.appendChild(card);
       $("stack").appendChild(wrap);
       await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp, transform: [dpr, 0, 0, dpr, 0, 0] }).promise;
 
-      const pg = { n, vp, el: pageEl, runs: [], editable: (page.rotate % 360) === 0 };
+      const pg = { n, vp, el: pageEl, block: wrap, label, runs: [], removed: false, editable: (page.rotate % 360) === 0 };
+      rm.addEventListener("click", () => { if (setRemoved(pg, true)) { commitHistory(); toast("Page " + pg.n + " removed. Tap Restore page to bring it back."); } });
+      rs.addEventListener("click", () => { if (setRemoved(pg, false)) { commitHistory(); toast("Page " + pg.n + " restored"); } });
       state.pages.push(pg);
       if (pg.editable) {
         const tc = await page.getTextContent();
@@ -433,7 +449,7 @@ a.btn { text-decoration: none; }
 
   /* ---------- undo / redo ---------- */
   let hist = [], hi = -1, restoring = false;
-  const snap = () => JSON.stringify(state.pages.map((p) => p.runs.map((r) => ({ id: r.id, kind: r.kind, x: r.x, y: r.y, size: r.size, w: r.w, text: r.text, orig: r.orig, color: r.color, dirty: !!r.dirty }))));
+  const snap = () => JSON.stringify({ removed: state.pages.map((p) => !!p.removed), runs: state.pages.map((p) => p.runs.map((r) => ({ id: r.id, kind: r.kind, x: r.x, y: r.y, size: r.size, w: r.w, text: r.text, orig: r.orig, color: r.color, dirty: !!r.dirty }))) });
   function updateHistoryButtons() { $("undo").disabled = hi <= 0; $("redo").disabled = hi >= hist.length - 1; }
   function resetHistory(empty) { hist = empty ? [] : [snap()]; hi = empty ? -1 : 0; updateHistoryButtons(); }
   function commitHistory() {
@@ -447,8 +463,10 @@ a.btn { text-decoration: none; }
     const data = JSON.parse(json);
     state.pages.forEach((pg, i) => {
       pg.runs.forEach((r) => r.el.remove()); pg.runs = [];
-      (data[i] || []).forEach((o) => { const r = Object.assign({}, o, { page: pg }); pg.runs.push(r); mountRun(r); });
+      ((data.runs && data.runs[i]) || []).forEach((o) => { const r = Object.assign({}, o, { page: pg }); pg.runs.push(r); mountRun(r); });
+      pg.removed = !!(data.removed && data.removed[i]); pg.block.classList.toggle("removed", pg.removed);
     });
+    updatePager();
     state.sel = null; $("del").disabled = true; restoring = false;
   }
   function undo() { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); if (hi > 0) { hi--; restore(hist[hi]); updateHistoryButtons(); document.dispatchEvent(new CustomEvent("petal-change")); } }
@@ -461,11 +479,23 @@ a.btn { text-decoration: none; }
     else if (k === "y") { e.preventDefault(); redo(); }
   });
 
+  const keptCount = () => state.pages.filter((p) => !p.removed).length;
+  let currentPageNo = 1;
+  function updatePager() {
+    const total = state.pages.length, gone = total - keptCount();
+    $("pager").textContent = "Page " + currentPageNo + " of " + total + (gone ? " (" + gone + " removed)" : "");
+  }
+  function setRemoved(pg, value) {
+    if (value && !pg.removed && keptCount() <= 1) { toast("A PDF needs at least one page, so this one stays."); return false; }
+    if (!!pg.removed === !!value) return false;
+    if (value && state.sel && state.sel.page === pg) { state.sel = null; $("del").disabled = true; }
+    pg.removed = !!value; pg.block.classList.toggle("removed", pg.removed); updatePager(); return true;
+  }
   function watchPager() {
-    const total = state.pages.length; $("pager").textContent = "Page 1 of " + total;
+    const total = state.pages.length; currentPageNo = 1; updatePager();
     if (!("IntersectionObserver" in window)) return;
     const io = new IntersectionObserver((es) => {
-      es.forEach((en) => { if (en.isIntersecting) $("pager").textContent = "Page " + en.target.dataset.page + " of " + total; });
+      es.forEach((en) => { if (en.isIntersecting) { currentPageNo = Number(en.target.dataset.page); updatePager(); } });
     }, { threshold: 0.4 });
     document.querySelectorAll(".page-block").forEach((b) => io.observe(b));
   }
@@ -498,7 +528,7 @@ a.btn { text-decoration: none; }
     const pdfPages = doc.getPages();
     let skipped = 0;
     state.pages.forEach((pg, i) => {
-      const page = pdfPages[i]; if (!page) return;
+      const page = pdfPages[i]; if (!page || pg.removed) return;
       pg.runs.forEach((r) => {
         const text = clean(r.text || "");
         if (r.kind === "orig") {
@@ -512,6 +542,7 @@ a.btn { text-decoration: none; }
         page.drawText(text, { x: r.x, y: r.y, size: r.size, font, color: rgb(c.r, c.g, c.b) });
       });
     });
+    for (let i = state.pages.length - 1; i >= 0; i--) { if (state.pages[i].removed && pdfPages[i]) doc.removePage(i); }
     const bytes = await doc.save();
     return { bytes, skipped };
   }
@@ -529,9 +560,10 @@ a.btn { text-decoration: none; }
   }
   async function buildDocx() {
     const D = window.docx; if (!D) throw new Error("docx missing");
-    const all = state.pages.flatMap((p) => p.runs.map((r) => r.size)).sort((a, b) => a - b);
+    const keptPages = state.pages.filter((p) => !p.removed);
+    const all = keptPages.flatMap((p) => p.runs.map((r) => r.size)).sort((a, b) => a - b);
     const median = all.length ? all[Math.floor(all.length / 2)] : 12;
-    const sections = state.pages.map((pg) => {
+    const sections = keptPages.map((pg) => {
       const lines = collectLines(pg); const kids = []; let prevY = null;
       lines.forEach((ln) => {
         const gap = prevY === null ? 0 : prevY - ln.y; prevY = ln.y;
@@ -566,10 +598,10 @@ a.btn { text-decoration: none; }
   }
   const kb = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB");
   function plainText() {
-    return state.pages.map((pg) => collectLines(pg).map((ln) => ln.parts.map((r) => r.text.replace(/\s+/g, " ")).join("   ")).join("\n")).join("\n\n");
+    return state.pages.filter((pg) => !pg.removed).map((pg) => collectLines(pg).map((ln) => ln.parts.map((r) => r.text.replace(/\s+/g, " ")).join("   ")).join("\n")).join("\n\n");
   }
   function countEdits() {
-    return state.pages.reduce((n, pg) => n + pg.runs.filter((r) => (r.kind === "added" ? r.text.trim() !== "" : changed(r))).length, 0);
+    return state.pages.reduce((n, pg) => n + (pg.removed ? 1 : pg.runs.filter((r) => (r.kind === "added" ? r.text.trim() !== "" : changed(r))).length), 0);
   }
   function ready(filename, data, size, label) {
     pending = { filename, data };
